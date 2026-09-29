@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LUMOUS — Voice Assistant</title>
+<style>
+  :root{
+    --bg:#fffaf4;
+    --bg-2:#fff2e4;
+    --card:#ffffff;
+    --ink:#3b3029;
+    --ink-soft:#8b7a6d;
+    --line:#f2e2d2;
+    --orange:#ffb27a;
+    --orange-deep:#f79256;
+    --orange-soft:#ffe6d2;
+    --mint:#bfe3d0;
+    --radius:22px;
+    --shadow:0 18px 40px -22px rgba(203,126,71,.45);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family:ui-rounded,"Segoe UI Rounded","Nunito",system-ui,-apple-system,"Segoe UI",sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(900px 600px at 15% -10%, #fff1e2 0%, transparent 60%),
+      radial-gradient(800px 600px at 95% 10%, #fdf0ff 0%, transparent 55%),
+      var(--bg);
+    display:flex; flex-direction:column; min-height:100vh;
+  }
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px 26px;gap:16px;flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:center;gap:12px}
+  .dot{width:14px;height:14px;border-radius:50%;background:var(--orange-deep);box-shadow:0 0 0 6px var(--orange-soft)}
+  .brand h1{font-size:19px;margin:0;letter-spacing:.14em;font-weight:800}
+  .brand span{font-size:12px;color:var(--ink-soft);letter-spacing:.06em}
+  .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  button{
+    font:inherit;font-weight:700;cursor:pointer;border:none;border-radius:999px;
+    padding:11px 20px;background:var(--orange-deep);color:#fff;
+    box-shadow:0 10px 22px -12px rgba(247,146,86,.9);transition:.18s transform,.18s filter;
+  }
+  button:hover{transform:translateY(-1px);filter:brightness(1.04)}
+  button.ghost{background:#fff;color:var(--ink);border:1.5px solid var(--line);box-shadow:none}
+  button.live{background:#ef8a7c}
+  input[type=text],input[type=password]{
+    font:inherit;padding:11px 16px;border-radius:999px;border:1.5px solid var(--line);
+    background:#fff;color:var(--ink);outline:none;min-width:0;
+  }
+  input:focus{border-color:var(--orange)}
+
+  main{flex:1;display:grid;grid-template-columns:1.15fr .85fr;gap:22px;padding:6px 26px 26px}
+  @media (max-width:940px){main{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1.5px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+
+  /* ---------- FACE ---------- */
+  .stage{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:26px;gap:18px;min-height:380px;
+    background:linear-gradient(160deg,#fff 0%,var(--bg-2) 100%)}
+  .face{width:min(420px,88%);aspect-ratio:2/1;display:flex;align-items:center;justify-content:center;gap:9%}
+  .eye{
+    position:relative;width:38%;height:76%;
+    background:var(--orange-soft);
+    border-radius:46% 46% 46% 46%/50% 50% 50% 50%;
+    box-shadow:inset 0 -10px 24px rgba(247,146,86,.22), 0 16px 30px -20px rgba(247,146,86,.9);
+    overflow:hidden;
+    transition:height .25s ease, border-radius .3s ease, transform .3s ease, background .3s ease;
+  }
+  .pupil{
+    position:absolute;left:50%;top:50%;width:42%;height:42%;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #ffc79c 0%, var(--orange-deep) 45%, #d9713f 100%);
+    transform:translate(-50%,-50%);transition:transform .16s cubic-bezier(.3,1.4,.5,1), width .25s, height .25s;
+  }
+  .pupil::after{content:"";position:absolute;top:16%;left:18%;width:30%;height:30%;border-radius:50%;background:#fff;opacity:.85}
+  .lid{
+    position:absolute;left:-5%;width:110%;height:60%;background:linear-gradient(#fff9f2,#fff6ee);
+    transition:transform .25s ease;
+  }
+  .lid.top{top:0;transform:translateY(-100%)}
+  .lid.bottom{bottom:0;transform:translateY(100%)}
+  .blink .lid.top{transform:translateY(0)}
+  .blink .lid.bottom{transform:translateY(0)}
+
+  /* emotions */
+  .face[data-emotion="happy"] .eye{height:52%;border-radius:50% 50% 46% 46%/70% 70% 40% 40%}
+  .face[data-emotion="happy"] .pupil{width:48%;height:38%}
+  .face[data-emotion="thinking"] #eyeL{transform:translateY(-6%) rotate(-8deg)}
+  .face[data-emotion="thinking"] #eyeR{transform:translateY(4%) rotate(6deg);height:60%}
+  .face[data-emotion="surprised"] .eye{height:88%}
+  .face[data-emotion="surprised"] .pupil{width:54%;height:54%}
+  .face[data-emotion="sad"] #eyeL{transform:rotate(12deg)}
+  .face[data-emotion="sad"] #eyeR{transform:rotate(-12deg)}
+  .face[data-emotion="sad"] .eye{height:62%;background:#ffe9e0}
+  .face[data-emotion="listening"] .eye{background:#e7f3ec;box-shadow:inset 0 -10px 24px rgba(110,180,140,.22)}
+  .face[data-emotion="listening"] .pupil{background:radial-gradient(circle at 35% 30%,#bfe7cf 0%,#6fb894 45%,#4a8f6f 100%)}
+  .face[data-emotion="speaking"] .eye{animation:bob 1s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+  .face[data-emotion="sleeping"] .eye{height:12%;border-radius:40px}
+  .face[data-emotion="sleeping"] .pupil{opacity:0}
+
+  .statusline{display:flex;align-items:center;gap:10px;color:var(--ink-soft);font-size:14px;font-weight:600}
+  .pulse{width:10px;height:10px;border-radius:50%;background:var(--mint);animation:p 1.6s infinite}
+  @keyframes p{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
+  .mood{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--orange-deep);font-weight:800}
+  .heard{
+    min-height:44px;max-width:520px;text-align:center;font-size:15px;color:var(--ink-soft);
+    background:#fff;border:1.5px dashed var(--line);border-radius:16px;padding:10px 16px;width:100%;
+  }
+  .heard b{color:var(--orange-deep)}
+
+  /* ---------- CHAT ---------- */
+  .panel{display:flex;flex-direction:column;overflow:hidden}
+  .panel h3{margin:0;padding:16px 20px;font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);border-bottom:1.5px solid var(--line)}
+  .chat{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px;min-height:260px;max-height:52vh}
+  .msg{padding:11px 15px;border-radius:16px;line-height:1.5;font-size:15px;max-width:88%;white-space:pre-wrap;word-break:break-word}
+  .msg.user{align-self:flex-end;background:var(--orange-soft);border-bottom-right-radius:5px}
+  .msg.bot{align-self:flex-start;background:#fbf7f3;border:1.5px solid var(--line);border-bottom-left-radius:5px}
+  .msg.tool{align-self:center;font-size:12px;font-family:ui-monospace,Menlo,monospace;background:#f4f8f5;color:#4a8f6f;border:1.5px solid #dcebe2;border-radius:12px;max-width:95%}
+  .composer{display:flex;gap:8px;padding:14px;border-top:1.5px solid var(--line)}
+  .composer input{flex:1}
+  .memlist{padding:12px 18px 18px;font-size:13px;color:var(--ink-soft);border-top:1.5px solid var(--line);max-height:150px;overflow:auto}
+  .memlist div{padding:4px 0;border-bottom:1px dashed var(--line)}
+  .memlist b{color:var(--ink)}
+  footer{padding:0 26px 22px;font-size:12px;color:var(--ink-soft)}
+  .keybar{display:none;gap:8px;align-items:center}
+  .keybar.show{display:flex}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="dot"></div>
+    <div>
+      <h1>LUMOUS</h1>
+      <span>say “Lumous …” to wake me</span>
+    </div>
+  </div>
+  <div class="controls">
+    <div class="keybar" id="keybar">
+      <input type="password" id="keyInput" placeholder="OpenRouter API key (sk-or-…)" />
+      <input type="password" id="cartesiaKeyInput" placeholder="Cartesia API key (for voice)" />
+      <button class="ghost" onclick="saveKey()">Save keys</button>
+    </div>
+    <button class="ghost" onclick="toggleKeybar()">🔑</button>
+    <button class="ghost" onclick="clearAll()">Reset</button>
+    <button id="micBtn" onclick="toggleMic()">🎙️ Enable voice</button>
+  </div>
+</header>
+
+<main>
+  <section class="card stage">
+    <div class="face" id="face" data-emotion="sleeping">
+      <div class="eye" id="eyeL"><div class="pupil"></div><div class="lid top"></div><div class="lid bottom"></div></div>
+      <div class="eye" id="eyeR"><div class="pupil"></div><div class="lid top"></div><div class="lid bottom"></div></div>
+    </div>
+    <div class="mood" id="mood">asleep</div>
+    <div class="statusline"><span class="pulse"></span><span id="status">Voice engine off — click “Enable voice”.</span></div>
+    <div class="heard" id="heard">Wake word not detected yet.</div>
+  </section>
+
+  <section class="card panel">
+    <h3>Conversation</h3>
+    <div class="chat" id="chat"></div>
+    <div class="composer">
+      <input type="text" id="textInput" placeholder="…or type here and press Enter" onkeydown="if(event.key==='Enter')sendTyped()" />
+      <button onclick="sendTyped()">Send</button>
+    </div>
+    <div class="memlist" id="memlist"></div>
+  </section>
+</main>
+
+<footer>Tools available to the model: get_time · http_request · remember · recall · forget · set_reminder · list_reminders · cancel_reminder · set_emotion. Memories and reminders live in this browser’s local storage.</footer>
+
+<script>
+/* ============================ CONFIG ============================ */
+const INJECTED_KEY = "@secret:OPENROUTER_API_KEY";
+const MODEL = "openai/gpt-4o-mini";
+const WAKE_WORDS = ["lumous","lumos","hey lumous","hey lumos","hello", "hi"];
+/* Cartesia TTS */
+const CARTESIA_API_KEY = "sk_car_s34N4f1QWa9rxKnHYsMTCZ";
+const CARTESIA_VOICE = "a33f7a4c-100f-41cf-a1fd-5822e8fc253f";
+const CARTESIA_MODEL = "sonic-3.6";
+const CARTESIA_URL = "https://api.cartesia.ai/tts/bytes";
+const CARTESIA_VERSION = "2025-04-16";
+
+function apiKey(){
+  const stored = localStorage.getItem("lumous_api_key");
+  if (stored) return stored;
+  if (INJECTED_KEY && !INJECTED_KEY.startsWith("@secret")) return INJECTED_KEY;
+  return "";
+}
+function cartesiaKey(){ return localStorage.getItem("lumous_cartesia_key") || CARTESIA_API_KEY; }
+function saveKey(){
+  const v = document.getElementById("keyInput").value.trim();
+  if(v){ localStorage.setItem("lumous_api_key", v); }
+  const c = document.getElementById("cartesiaKeyInput").value.trim();
+  if(c){ localStorage.setItem("lumous_cartesia_key", c); }
+  if(v || c) setStatus("Keys saved in this browser.");
+  document.getElementById("keybar").classList.remove("show");
+}
+function toggleKeybar(){ document.getElementById("keybar").classList.toggle("show"); }
+
+/* ============================ STORAGE ============================ */
+const DB = {
+  get(k, d){ try{ return JSON.parse(localStorage.getItem(k)) ?? d; }catch(e){ return d; } },
+  set(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
+};
+const memories  = () => DB.get("lumous_memories", {});
+const reminders = () => DB.get("lumous_reminders", []);
+
+function renderMem(){
+  const m = memories(), r = reminders();
+  const el = document.getElementById("memlist");
+  const mem = Object.keys(m).map(k=>`<div><b>${esc(k)}</b> — ${esc(String(m[k]))}</div>`).join("");
+  const rem = r.map(x=>`<div>⏰ <b>${esc(x.text)}</b> — ${new Date(x.at).toLocaleString()}</div>`).join("");
+  el.innerHTML = (mem||rem) ? (mem+rem) : "No memories or reminders saved yet.";
+}
+function esc(s){ return String(s).replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+function clearAll(){
+  localStorage.removeItem("lumous_memories");
+  localStorage.removeItem("lumous_reminders");
+  history_ = [{role:"system", content: SYSTEM_PROMPT()}];
+  document.getElementById("chat").innerHTML = "";
+  renderMem(); setStatus("Memories, reminders and chat cleared.");
+}
+
+/* ============================ TOOLS (JSON) ============================ */
+const TOOLS = [
+  { type:"function", function:{ name:"get_time", description:"Current date and time of the user's device.",
+    parameters:{ type:"object", properties:{ timezone:{type:"string", description:"IANA timezone, optional"} }, required:[] } } },
+
+  { type:"function", function:{ name:"http_request", description:"Perform an HTTP request to a public API and return the response body (truncated).",
+    parameters:{ type:"object", properties:{
+      url:{type:"string"}, method:{type:"string", enum:["GET","POST"]},
+      headers:{type:"object", description:"Optional header map"}, body:{type:"string", description:"Optional request body"} },
+      required:["url"] } } },
+
+  { type:"function", function:{ name:"remember", description:"Store a fact in long-term local memory under a key.",
+    parameters:{ type:"object", properties:{ key:{type:"string"}, value:{type:"string"} }, required:["key","value"] } } },
+
+  { type:"function", function:{ name:"recall", description:"Read stored memories. Omit key to list everything.",
+    parameters:{ type:"object", properties:{ key:{type:"string"} }, required:[] } } },
+
+  { type:"function", function:{ name:"forget", description:"Delete a stored memory by key.",
+    parameters:{ type:"object", properties:{ key:{type:"string"} }, required:["key"] } } },
+
+  { type:"function", function:{ name:"set_reminder", description:"Create a reminder that alerts in this browser.",
+    parameters:{ type:"object", properties:{
+      text:{type:"string"}, in_minutes:{type:"number", description:"Minutes from now"},
+      at_iso:{type:"string", description:"Absolute ISO datetime (alternative to in_minutes)"} }, required:["text"] } } },
+
+  { type:"function", function:{ name:"list_reminders", description:"List pending reminders.",
+    parameters:{ type:"object", properties:{}, required:[] } } },
+
+  { type:"function", function:{ name:"cancel_reminder", description:"Cancel a reminder by its id.",
+    parameters:{ type:"object", properties:{ id:{type:"string"} }, required:["id"] } } },
+
+  { type:"function", function:{ name:"set_emotion", description:"Set the face expression shown to the user.",
+    parameters:{ type:"object", properties:{ emotion:{type:"string", enum:["neutral","happy","thinking","surprised","sad","listening"]} }, required:["emotion"] } } }
+];
+
+async function runTool(name, args){
+  try{
+    switch(name){
+      case "get_time": {
+        const now = new Date();
+        return { iso: now.toISOString(),
+                 local: args.timezone ? now.toLocaleString("en-US",{timeZone:args.timezone}) : now.toLocaleString(),
+                 timezone: args.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone };
+      }
+      case "http_request": {
+        const res = await fetch(args.url, { method: args.method || "GET", headers: args.headers || {}, body: args.body });
+        const text = (await res.text()).slice(0, 4000);
+        return { status: res.status, body: text };
+      }
+      case "remember": { const m = memories(); m[args.key] = args.value; DB.set("lumous_memories", m); renderMem(); return {saved:true, key:args.key}; }
+      case "recall": { const m = memories(); return args.key ? { key:args.key, value: m[args.key] ?? null } : { memories: m }; }
+      case "forget": { const m = memories(); delete m[args.key]; DB.set("lumous_memories", m); renderMem(); return {deleted:true}; }
+      case "set_reminder": {
+        const at = args.at_iso ? new Date(args.at_iso).getTime() : Date.now() + (args.in_minutes ?? 5)*60000;
+        const r = reminders(); const item = { id: "r"+Date.now(), text: args.text, at };
+        r.push(item); DB.set("lumous_reminders", r); renderMem(); scheduleReminders();
+        return { created:true, id:item.id, at: new Date(at).toLocaleString() };
+      }
+      case "list_reminders": return { reminders: reminders().map(r=>({id:r.id, text:r.text, at:new Date(r.at).toLocaleString()})) };
+      case "cancel_reminder": { DB.set("lumous_reminders", reminders().filter(r=>r.id!==args.id)); renderMem(); return {cancelled:true}; }
+      case "set_emotion": { setEmotion(args.emotion); return {ok:true}; }
+      default: return { error: "unknown tool" };
+    }
+  }catch(e){ return { error: String(e) }; }
+}
+
+const timers = new Set();
+function scheduleReminders(){
+  timers.forEach(clearTimeout); timers.clear();
+  reminders().forEach(r=>{
+    const delay = r.at - Date.now();
+    const fire = ()=>{
+      addMsg("⏰ Reminder: " + r.text, "bot"); setEmotion("surprised"); speak("Reminder. " + r.text);
+      DB.set("lumous_reminders", reminders().filter(x=>x.id!==r.id)); renderMem();
+    };
+    if (delay <= 0) fire(); else timers.add(setTimeout(fire, Math.min(delay, 2**31-1)));
+  });
+}
+
+/* ============================ PROMPT ============================ */
+function SYSTEM_PROMPT(){
+  return `You are Lumous, a warm, playful voice assistant with a pastel animated face.
+Keep spoken answers to 1-3 short sentences — they are read aloud.
+
+You have JSON tools. Use them instead of guessing:
+- get_time — whenever the user asks about the date, time or "how long until".
+- http_request — to fetch live public data (weather, news, APIs). Only public endpoints, no secrets.
+- remember(key, value) — whenever the user tells you something personal or says "remember ...".
+- recall(key?) — before answering anything personal; the user expects you to know saved facts.
+- forget(key) — when asked to forget something.
+- set_reminder(text, in_minutes | at_iso), list_reminders(), cancel_reminder(id) — for any reminder request.
+- set_emotion(emotion) — call this at the start of most replies to match your mood:
+  neutral, happy, thinking, surprised, sad, listening.
+
+VOICE EMOTION CUES (Cartesia Sonic) — USE THEM FREQUENTLY, in almost every reply.
+Put a self-closing tag right before the words it should color; switch emotions mid-reply when the mood shifts:
+  <emotion value="NAME"/>
+Allowed NAME values (use only these):
+  neutral, happy, excited, enthusiastic, elated, euphoric, triumphant, amazed, surprised, flirtatious, joking/comedic, curious, content, peaceful, serene, calm, grateful, affectionate, trust, sympathetic, anticipation, mysterious, angry, mad, outraged, frustrated, agitated, threatened, disgusted, contempt, envious, sarcastic, ironic, sad, dejected, melancholic, disappointed, hurt, guilty, bored, tired, rejected, nostalgic, wistful, apologetic, hesitant, insecure, confused, resigned, anxious, panicked, alarmed, scared, proud, confident, distant, skeptical, contemplative, determined
+Other cues you may also use:
+  [laughter]                 — a real laugh; use when something is funny
+  <break time="500ms"/>      — a pause (ms or s, e.g. "1s")
+  <speed ratio="1.2"/>       — speaking speed, 0.6 to 1.5
+  <volume ratio="0.8"/>      — loudness, 0.5 to 2.0
+Example: <emotion value="excited"/>Oh nice, it's almost lunchtime! <break time="300ms"/><emotion value="joking/comedic"/>My favourite meal I can't eat. [laughter]
+The cues also drive your animated face, so vary them. Never explain the tags.
+
+Use these cues ALONG WITH Break time etc every time.
+
+Never mention tool names or JSON to the user; just act naturally.
+Known memories right now: ${JSON.stringify(memories())}`;
+}
+let history_ = [{ role:"system", content: SYSTEM_PROMPT() }];
+
+/* ============================ LLM LOOP ============================ */
+async function ask(prompt){
+  if (!apiKey()){ addMsg("No OpenRouter API key set. Click the 🔑 button and paste your key.","bot"); setEmotion("sad"); return; }
+  addMsg(prompt, "user");
+  history_[0] = { role:"system", content: SYSTEM_PROMPT() };
+  history_.push({ role:"user", content: prompt });
+  setEmotion("thinking"); setStatus("Thinking…");
+
+  for (let step = 0; step < 6; step++){
+    let data;
+    try{
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions",{
+        method:"POST",
+        headers:{ "Authorization":"Bearer "+apiKey(), "Content-Type":"application/json" },
+        body: JSON.stringify({ model: MODEL, messages: history_, tools: TOOLS, tool_choice:"auto" })
+      });
+      data = await res.json();
+      if (!res.ok) throw new Error(data?.error?.message || ("HTTP "+res.status));
+    }catch(e){
+      addMsg("I couldn't reach the model: " + e.message, "bot"); setEmotion("sad"); setStatus("Request failed."); return;
+    }
+
+    const m = data.choices?.[0]?.message;
+    if (!m){ addMsg("Empty response from the model.","bot"); setEmotion("sad"); return; }
+    history_.push(m);
+
+    if (m.tool_calls && m.tool_calls.length){
+      for (const call of m.tool_calls){
+        let args = {}; try{ args = JSON.parse(call.function.arguments || "{}"); }catch(e){}
+        setStatus("Using " + call.function.name + "…");
+        const out = await runTool(call.function.name, args);
+        if (call.function.name !== "set_emotion")
+          addMsg("🔧 " + call.function.name + "(" + JSON.stringify(args) + ") → " + JSON.stringify(out).slice(0,240), "tool");
+        history_.push({ role:"tool", tool_call_id: call.id, name: call.function.name, content: JSON.stringify(out) });
+      }
+      continue;
+    }
+
+    const reply = (m.content || "").trim() || "…";
+    addMsg(stripCues(reply) || "…", "bot");
+    speak(reply);
+    return;
+  }
+  addMsg("That took too many steps — ask me again?","bot"); setEmotion("sad");
+}
+
+/* ============================ UI ============================ */
+function addMsg(text, cls){
+  const chat = document.getElementById("chat");
+  const d = document.createElement("div");
+  d.className = "msg " + cls; d.textContent = text;
+  chat.appendChild(d); chat.scrollTop = chat.scrollHeight;
+}
+function setStatus(t){ document.getElementById("status").textContent = t; }
+function sendTyped(){
+  const i = document.getElementById("textInput");
+  const v = i.value.trim(); if(!v) return; i.value = "";
+  showHeard("typed", v); ask(v);
+}
+function showHeard(word, prompt){
+  document.getElementById("heard").innerHTML =
+    (word === "typed" ? "You said: " : "Wake word <b>“"+esc(word)+"”</b> detected — ") + "“" + esc(prompt) + "”";
+}
+
+/* ---------- eyes ---------- */
+const face = document.getElementById("face");
+let currentEmotion = "sleeping";
+function setEmotion(e){
+  currentEmotion = e; face.dataset.emotion = e;
+  document.getElementById("mood").textContent = e === "sleeping" ? "asleep" : e;
+}
+const pupils = document.querySelectorAll(".pupil");
+function lookAt(dx, dy){
+  pupils.forEach(p => p.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`);
+}
+document.addEventListener("mousemove", e=>{
+  const r = face.getBoundingClientRect();
+  const dx = Math.max(-1, Math.min(1, (e.clientX - (r.left+r.width/2)) / (r.width/2))) * 16;
+  const dy = Math.max(-1, Math.min(1, (e.clientY - (r.top+r.height/2)) / (r.height/2))) * 12;
+  lookAt(dx, dy);
+});
+setInterval(()=>{ // idle wander
+  if (currentEmotion === "thinking" || currentEmotion === "sleeping")
+    lookAt((Math.random()*2-1)*14, (Math.random()*2-1)*8);
+}, 1400);
+function blink(){
+  document.querySelectorAll(".eye").forEach(e=>e.classList.add("blink"));
+  setTimeout(()=>document.querySelectorAll(".eye").forEach(e=>e.classList.remove("blink")), 140);
+}
+(function loopBlink(){ setTimeout(()=>{ if(currentEmotion!=="sleeping") blink(); loopBlink(); }, 2200 + Math.random()*3500); })();
+
+/* ---------- speech out (Cartesia, fallback to browser voice) ---------- */
+let currentAudio = null;
+function afterSpeak(){
+  setEmotion(listening ? "sleeping" : "neutral");
+  setStatus(listening ? "Asleep — say “Lumous” to wake me." : "Idle.");
+}
+/* ---------- Cartesia cues ---------- */
+const CUE_RE = /<emotion\s+value="([^"]+)"\s*\/?>|<break[^>]*\/?>|<speed[^>]*\/?>|<volume[^>]*\/?>|\[laughter\]/gi;
+function stripCues(t){ return t.replace(CUE_RE, (m)=> /laughter/i.test(m) ? "haha" : "").replace(/\s{2,}/g," ").trim(); }
+function faceFor(cue){
+  const c = cue.toLowerCase();
+  if (/happy|excited|enthusias|elated|euphor|triumph|content|peace|serene|calm|grateful|affection|trust|flirt|joking|comedic|proud|confident|laughter/.test(c)) return "happy";
+  if (/amazed|surprised|alarmed|panick|scared|threat|anticipation/.test(c)) return "surprised";
+  if (/sad|dejected|melanch|disappoint|hurt|guilt|reject|nostalg|wistful|apolog|tired|bored|resigned|insecure|anxious/.test(c)) return "sad";
+  if (/curious|mysterious|confused|hesitant|skeptic|contempl|determined|sarcas|ironic|distant/.test(c)) return "thinking";
+  if (/angry|mad|outrag|frustrat|agitat|disgust|contempt|envious/.test(c)) return "sad";
+  return "neutral";
+}
+function cueTimeline(text){
+  const plainLen = Math.max(1, stripCues(text).length); const tl = []; let pos = 0, last = 0, m;
+  CUE_RE.lastIndex = 0;
+  while ((m = CUE_RE.exec(text))){
+    pos += stripCues(text.slice(last, m.index)).length; last = CUE_RE.lastIndex;
+    if (m[1]) tl.push({ at: pos/plainLen, face: faceFor(m[1]), cue: m[1] });
+    else if (/laughter/i.test(m[0])) tl.push({ at: pos/plainLen, face: "happy", cue: "laughter" });
+  }
+  return tl;
+}
+function applyCueAt(tl, frac){
+  let cur = null; for (const t of tl) if (t.at <= frac + 0.02) cur = t;
+  if (cur && cur !== applyCueAt._last){ applyCueAt._last = cur; setEmotion(cur.face); setStatus("Speaking… (" + cur.cue + ")"); }
+}
+
+async function speak(text){
+  setEmotion("speaking"); setStatus("Speaking…");
+  const tl = cueTimeline(text); applyCueAt._last = null; applyCueAt(tl, 0);
+  const key = cartesiaKey();
+  if (key){
+    try{
+      if (currentAudio){ currentAudio.pause(); currentAudio = null; }
+      const res = await fetch(CARTESIA_URL, {
+        method: "POST",
+        headers: {
+          "X-API-Key": key,
+          "Cartesia-Version": CARTESIA_VERSION,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model_id: CARTESIA_MODEL,
+          transcript: text,
+          voice: { mode: "id", id: CARTESIA_VOICE },
+          output_format: { container: "mp3", encoding: "mp3", sample_rate: 44100 }
+        })
+      });
+      if (!res.ok) throw new Error("Cartesia " + res.status);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      currentAudio = audio;
+      audio.ontimeupdate = ()=>{ if (audio.duration) applyCueAt(tl, audio.currentTime / audio.duration); };
+      audio.onended = ()=>{ URL.revokeObjectURL(url); currentAudio = null; afterSpeak(); };
+      audio.onerror = ()=>{ currentAudio = null; afterSpeak(); };
+      await audio.play();
+      return;
+    }catch(e){
+      addMsg("Cartesia voice failed (" + e.message + ") — using browser voice instead.", "tool");
+    }
+  }
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(stripCues(text));
+    u.rate = 1.03; u.pitch = 1.1;
+    u.onend = afterSpeak;
+    speechSynthesis.speak(u);
+  }catch(e){ afterSpeak(); }
+}
+
+/* ---------- speech in ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recog = null, listening = false, busy = false;
+if (SR){
+  recog = new SR(); recog.continuous = true; recog.interimResults = true; recog.lang = "en-US";
+  recog.onstart = ()=>{ setStatus("Asleep — say “Lumous” to wake me."); };
+  recog.onend = ()=>{ if (listening && !busy) { try{ recog.start(); }catch(e){} } };
+  recog.onerror = e => { if (e.error !== "no-speech") setStatus("Mic error: " + e.error); };
+  recog.onresult = async ev => {
+    if (busy) return;
+    let final = "";
+    for (let i = ev.resultIndex; i < ev.results.length; i++)
+      if (ev.results[i].isFinal) final += ev.results[i][0].transcript;
+    if (!final) return;
+    const low = final.toLowerCase().trim();
+    const word = WAKE_WORDS.find(w => low.includes(w));
+    if (!word) return;
+    const idx = low.indexOf(word);
+    let prompt = final.slice(idx + word.length).replace(/^[,.\s]+/, "").trim() || "Hello";
+    busy = true; blink(); setEmotion("surprised"); showHeard(word, prompt);
+    try{ recog.stop(); }catch(e){}
+    await ask(prompt);
+    busy = false;
+    if (listening){ try{ recog.start(); }catch(e){} }
+  };
+}
+function toggleMic(){
+  const btn = document.getElementById("micBtn");
+  if (!SR){ setStatus("This browser has no speech recognition — use Chrome or Edge, or type below."); return; }
+  if (!listening){
+    listening = true; try{ recog.start(); }catch(e){}
+    btn.textContent = "🛑 Disable voice"; btn.classList.add("live"); setEmotion("sleeping");
+  } else {
+    listening = false; try{ recog.stop(); }catch(e){}
+    btn.textContent = "🎙️ Enable voice"; btn.classList.remove("live");
+    setEmotion("sleeping"); setStatus("Voice engine off.");
+  }
+}
+
+/* ---------- boot ---------- */
+renderMem(); scheduleReminders();
+if (!apiKey()) document.getElementById("keybar").classList.add("show");
+addMsg("Hi! I'm Lumous. Turn on the mic and say “Lumous, what time is it?” — or just type.", "bot");
+</script>
+</body>
+</html>
