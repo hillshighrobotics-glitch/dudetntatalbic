@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>LUMOUS — Voice Assistant</title>
+<title>SPARKY — Voice Assistant</title>
 <style>
   :root{
     --bg:#fffaf4;
@@ -128,6 +128,10 @@
   footer{padding:0 26px 22px;font-size:12px;color:var(--ink-soft)}
   .keybar{display:none;gap:8px;align-items:center}
   .keybar.show{display:flex}
+  .provider-switch{display:flex;align-items:center;gap:4px;padding:4px;background:var(--bg-2);border:1.5px solid var(--line);border-radius:999px}
+  .provider-switch button{padding:7px 12px;background:transparent;color:var(--ink-soft);border-radius:999px;box-shadow:none;font-size:12px}
+  .provider-switch button.active{background:var(--card);color:var(--orange-deep);box-shadow:0 4px 12px -8px rgba(203,126,71,.8)}
+  .provider-label{font-size:12px;color:var(--ink-soft);font-weight:700}
 </style>
 </head>
 <body>
@@ -136,11 +140,17 @@
   <div class="brand">
     <div class="dot"></div>
     <div>
-      <h1>LUMOUS</h1>
-      <span>say “Lumous …” to wake me</span>
+      <h1>SPARKY</h1>
+      <span>say “Sparky …” to wake me</span>
     </div>
   </div>
   <div class="controls">
+    <span class="provider-label">AI</span>
+    <div class="provider-switch" role="group" aria-label="AI provider">
+      <button id="providerAuto" class="active" onclick="setProvider('auto')" title="Try OpenRouter, then Free AI">Auto</button>
+      <button id="providerOpenRouter" onclick="setProvider('openrouter')" title="Use OpenRouter only">OpenRouter</button>
+      <button id="providerFree" onclick="setProvider('free')" title="Use Free AI only">Free AI</button>
+    </div>
     <div class="keybar" id="keybar">
       <input type="password" id="keyInput" placeholder="OpenRouter API key (sk-or-…)" />
       <input type="password" id="cartesiaKeyInput" placeholder="Cartesia API key (for voice)" />
@@ -174,13 +184,16 @@
   </section>
 </main>
 
-<footer>Tools available to the model: get_time · http_request · remember · recall · forget · set_reminder · list_reminders · cancel_reminder · set_emotion. Memories and reminders live in this browser’s local storage.</footer>
+<footer>AI: OpenRouter with automatic Free AI fallback. Tools available to the model: get_time · http_request · remember · recall · forget · set_reminder · list_reminders · cancel_reminder · set_emotion. Memories and reminders live in this browser’s local storage.</footer>
 
 <script>
 /* ============================ CONFIG ============================ */
 const INJECTED_KEY = "@secret:OPENROUTER_API_KEY";
 const MODEL = "openai/gpt-4o-mini";
-const WAKE_WORDS = ["lumous","lumos","hey lumous","hey lumos","hello", "hi"];
+const FREE_AI_URL = "https://api.free.ai/v1/chat/";
+const FREE_AI_MODEL = "qwen7b";
+let providerMode = localStorage.getItem("sparky_provider") || "auto";
+const WAKE_WORDS = ["sparky","hey sparky"];
 /* Cartesia TTS */
 const CARTESIA_API_KEY = "sk_car_s34N4f1QWa9rxKnHYsMTCZ";
 const CARTESIA_VOICE = "a33f7a4c-100f-41cf-a1fd-5822e8fc253f";
@@ -189,29 +202,45 @@ const CARTESIA_URL = "https://api.cartesia.ai/tts/bytes";
 const CARTESIA_VERSION = "2025-04-16";
 
 function apiKey(){
-  const stored = localStorage.getItem("lumous_api_key");
+  const stored = localStorage.getItem("sparky_api_key");
   if (stored) return stored;
   if (INJECTED_KEY && !INJECTED_KEY.startsWith("@secret")) return INJECTED_KEY;
   return "";
 }
-function cartesiaKey(){ return localStorage.getItem("lumous_cartesia_key") || CARTESIA_API_KEY; }
+function cartesiaKey(){ return localStorage.getItem("sparky_cartesia_key") || CARTESIA_API_KEY; }
 function saveKey(){
   const v = document.getElementById("keyInput").value.trim();
-  if(v){ localStorage.setItem("lumous_api_key", v); }
+  if(v){ localStorage.setItem("sparky_api_key", v); }
   const c = document.getElementById("cartesiaKeyInput").value.trim();
-  if(c){ localStorage.setItem("lumous_cartesia_key", c); }
+  if(c){ localStorage.setItem("sparky_cartesia_key", c); }
   if(v || c) setStatus("Keys saved in this browser.");
   document.getElementById("keybar").classList.remove("show");
 }
 function toggleKeybar(){ document.getElementById("keybar").classList.toggle("show"); }
+function setProvider(mode){
+  providerMode = ["auto","openrouter","free"].includes(mode) ? mode : "auto";
+  localStorage.setItem("sparky_provider", providerMode);
+  ["Auto","OpenRouter","Free"].forEach(name=>{
+    const el = document.getElementById("provider" + name);
+    const active = name.toLowerCase() === providerMode;
+    el.classList.toggle("active", active); el.setAttribute("aria-pressed", String(active));
+  });
+  const labels = {auto:"Auto: OpenRouter with Free AI fallback", openrouter:"OpenRouter selected", free:"Free AI selected"};
+  setStatus(labels[providerMode]);
+}
+function migrateOldStorage(){
+  [["lumous_api_key","sparky_api_key"],["lumous_cartesia_key","sparky_cartesia_key"],["lumous_memories","sparky_memories"],["lumous_reminders","sparky_reminders"]].forEach(([oldKey,newKey])=>{
+    if(localStorage.getItem(newKey) === null && localStorage.getItem(oldKey) !== null) localStorage.setItem(newKey, localStorage.getItem(oldKey));
+  });
+}
 
 /* ============================ STORAGE ============================ */
 const DB = {
   get(k, d){ try{ return JSON.parse(localStorage.getItem(k)) ?? d; }catch(e){ return d; } },
   set(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
 };
-const memories  = () => DB.get("lumous_memories", {});
-const reminders = () => DB.get("lumous_reminders", []);
+const memories  = () => DB.get("sparky_memories", {});
+const reminders = () => DB.get("sparky_reminders", []);
 
 function renderMem(){
   const m = memories(), r = reminders();
@@ -222,8 +251,8 @@ function renderMem(){
 }
 function esc(s){ return String(s).replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
 function clearAll(){
-  localStorage.removeItem("lumous_memories");
-  localStorage.removeItem("lumous_reminders");
+  localStorage.removeItem("sparky_memories");
+  localStorage.removeItem("sparky_reminders");
   history_ = [{role:"system", content: SYSTEM_PROMPT()}];
   document.getElementById("chat").innerHTML = "";
   renderMem(); setStatus("Memories, reminders and chat cleared.");
@@ -278,17 +307,17 @@ async function runTool(name, args){
         const text = (await res.text()).slice(0, 4000);
         return { status: res.status, body: text };
       }
-      case "remember": { const m = memories(); m[args.key] = args.value; DB.set("lumous_memories", m); renderMem(); return {saved:true, key:args.key}; }
+      case "remember": { const m = memories(); m[args.key] = args.value; DB.set("sparky_memories", m); renderMem(); return {saved:true, key:args.key}; }
       case "recall": { const m = memories(); return args.key ? { key:args.key, value: m[args.key] ?? null } : { memories: m }; }
-      case "forget": { const m = memories(); delete m[args.key]; DB.set("lumous_memories", m); renderMem(); return {deleted:true}; }
+      case "forget": { const m = memories(); delete m[args.key]; DB.set("sparky_memories", m); renderMem(); return {deleted:true}; }
       case "set_reminder": {
         const at = args.at_iso ? new Date(args.at_iso).getTime() : Date.now() + (args.in_minutes ?? 5)*60000;
         const r = reminders(); const item = { id: "r"+Date.now(), text: args.text, at };
-        r.push(item); DB.set("lumous_reminders", r); renderMem(); scheduleReminders();
+        r.push(item); DB.set("sparky_reminders", r); renderMem(); scheduleReminders();
         return { created:true, id:item.id, at: new Date(at).toLocaleString() };
       }
       case "list_reminders": return { reminders: reminders().map(r=>({id:r.id, text:r.text, at:new Date(r.at).toLocaleString()})) };
-      case "cancel_reminder": { DB.set("lumous_reminders", reminders().filter(r=>r.id!==args.id)); renderMem(); return {cancelled:true}; }
+      case "cancel_reminder": { DB.set("sparky_reminders", reminders().filter(r=>r.id!==args.id)); renderMem(); return {cancelled:true}; }
       case "set_emotion": { setEmotion(args.emotion); return {ok:true}; }
       default: return { error: "unknown tool" };
     }
@@ -302,7 +331,7 @@ function scheduleReminders(){
     const delay = r.at - Date.now();
     const fire = ()=>{
       addMsg("⏰ Reminder: " + r.text, "bot"); setEmotion("surprised"); speak("Reminder. " + r.text);
-      DB.set("lumous_reminders", reminders().filter(x=>x.id!==r.id)); renderMem();
+      DB.set("sparky_reminders", reminders().filter(x=>x.id!==r.id)); renderMem();
     };
     if (delay <= 0) fire(); else timers.add(setTimeout(fire, Math.min(delay, 2**31-1)));
   });
@@ -310,7 +339,7 @@ function scheduleReminders(){
 
 /* ============================ PROMPT ============================ */
 function SYSTEM_PROMPT(){
-  return `You are Lumous, a warm, playful voice assistant with a pastel animated face.
+  return `You are Sparky, a warm, playful voice assistant with a pastel animated face.
 Keep spoken answers to 1-3 short sentences — they are read aloud.
 
 You have JSON tools. Use them instead of guessing:
@@ -336,57 +365,92 @@ Other cues you may also use:
 Example: <emotion value="excited"/>Oh nice, it's almost lunchtime! <break time="300ms"/><emotion value="joking/comedic"/>My favourite meal I can't eat. [laughter]
 The cues also drive your animated face, so vary them. Never explain the tags.
 
-Use these cues ALONG WITH Break time etc every time.
-
 Never mention tool names or JSON to the user; just act naturally.
 Known memories right now: ${JSON.stringify(memories())}`;
 }
 let history_ = [{ role:"system", content: SYSTEM_PROMPT() }];
 
 /* ============================ LLM LOOP ============================ */
-async function ask(prompt){
-  if (!apiKey()){ addMsg("No OpenRouter API key set. Click the 🔑 button and paste your key.","bot"); setEmotion("sad"); return; }
-  addMsg(prompt, "user");
-  history_[0] = { role:"system", content: SYSTEM_PROMPT() };
-  history_.push({ role:"user", content: prompt });
-  setEmotion("thinking"); setStatus("Thinking…");
-
+async function openRouterReply(){
+  if (!apiKey()) throw new Error("No OpenRouter API key is set");
   for (let step = 0; step < 6; step++){
-    let data;
-    try{
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions",{
-        method:"POST",
-        headers:{ "Authorization":"Bearer "+apiKey(), "Content-Type":"application/json" },
-        body: JSON.stringify({ model: MODEL, messages: history_, tools: TOOLS, tool_choice:"auto" })
-      });
-      data = await res.json();
-      if (!res.ok) throw new Error(data?.error?.message || ("HTTP "+res.status));
-    }catch(e){
-      addMsg("I couldn't reach the model: " + e.message, "bot"); setEmotion("sad"); setStatus("Request failed."); return;
-    }
-
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions",{
+      method:"POST",
+      headers:{ "Authorization":"Bearer "+apiKey(), "Content-Type":"application/json" },
+      body: JSON.stringify({ model: MODEL, messages: history_, tools: TOOLS, tool_choice:"auto" })
+    });
+    let data = {}; try{ data = await res.json(); }catch(e){}
+    if (!res.ok) throw new Error(data?.error?.message || ("OpenRouter HTTP "+res.status));
     const m = data.choices?.[0]?.message;
-    if (!m){ addMsg("Empty response from the model.","bot"); setEmotion("sad"); return; }
+    if (!m) throw new Error("OpenRouter returned an empty response");
     history_.push(m);
-
     if (m.tool_calls && m.tool_calls.length){
       for (const call of m.tool_calls){
         let args = {}; try{ args = JSON.parse(call.function.arguments || "{}"); }catch(e){}
         setStatus("Using " + call.function.name + "…");
         const out = await runTool(call.function.name, args);
-        if (call.function.name !== "set_emotion")
-          addMsg("🔧 " + call.function.name + "(" + JSON.stringify(args) + ") → " + JSON.stringify(out).slice(0,240), "tool");
+        if (call.function.name !== "set_emotion") addMsg("🔧 " + call.function.name + "(" + JSON.stringify(args) + ") → " + JSON.stringify(out).slice(0,240), "tool");
         history_.push({ role:"tool", tool_call_id: call.id, name: call.function.name, content: JSON.stringify(out) });
       }
       continue;
     }
-
-    const reply = (m.content || "").trim() || "…";
-    addMsg(stripCues(reply) || "…", "bot");
-    speak(reply);
-    return;
+    return (m.content || "").trim() || "…";
   }
-  addMsg("That took too many steps — ask me again?","bot"); setEmotion("sad");
+  throw new Error("OpenRouter used too many tool steps");
+}
+
+async function freeAiReply(){
+  const cleanMessages = history_.filter(m=>m.role === "system" || m.role === "user" || (m.role === "assistant" && typeof m.content === "string"))
+    .map(m=>({role:m.role, content:m.content}));
+  const res = await fetch(FREE_AI_URL,{
+    method:"POST",
+    headers:{"Accept":"*/*","Content-Type":"application/json"},
+    body:JSON.stringify({messages:cleanMessages,model:FREE_AI_MODEL,stream:true,lang:"en",work_session_id:"",work_mode:false})
+  });
+  if(!res.ok) throw new Error("Free AI HTTP " + res.status);
+  if(!res.body) throw new Error("Free AI returned no stream");
+  const reader=res.body.getReader(), decoder=new TextDecoder();
+  let buffer="", reply="";
+  while(true){
+    const {value,done}=await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), {stream:!done});
+    const lines=buffer.split(/\r?\n/); buffer=lines.pop() || "";
+    for(const line of lines){
+      if(!line.startsWith("data: ")) continue;
+      const raw=line.slice(6).trim(); if(!raw || raw==="[DONE]") continue;
+      try{ reply += JSON.parse(raw).choices?.[0]?.delta?.content || ""; }catch(e){}
+    }
+    if(done) break;
+  }
+  if(buffer.startsWith("data: ")){
+    try{ reply += JSON.parse(buffer.slice(6).trim()).choices?.[0]?.delta?.content || ""; }catch(e){}
+  }
+  if(!reply.trim()) throw new Error("Free AI returned an empty response");
+  history_.push({role:"assistant",content:reply});
+  return reply.trim();
+}
+
+async function ask(prompt){
+  addMsg(prompt, "user");
+  history_[0] = { role:"system", content: SYSTEM_PROMPT() };
+  history_.push({ role:"user", content: prompt });
+  setEmotion("thinking"); setStatus("Thinking…");
+  try{
+    let reply;
+    if(providerMode === "free") reply = await freeAiReply();
+    else if(providerMode === "openrouter") reply = await openRouterReply();
+    else{
+      try{ reply = await openRouterReply(); }
+      catch(primaryError){
+        setStatus("OpenRouter unavailable — trying Free AI…");
+        addMsg("OpenRouter unavailable — switched to Free AI for this reply.", "tool");
+        reply = await freeAiReply();
+      }
+    }
+    addMsg(stripCues(reply) || "…", "bot"); speak(reply);
+  }catch(e){
+    addMsg("I couldn't reach the selected AI: " + e.message, "bot"); setEmotion("sad"); setStatus("Request failed.");
+  }
 }
 
 /* ============================ UI ============================ */
@@ -409,8 +473,9 @@ function showHeard(word, prompt){
 
 /* ---------- eyes ---------- */
 const face = document.getElementById("face");
-let currentEmotion = "sleeping";
+let currentEmotion = "sleeping", eyesAwake = false;
 function setEmotion(e){
+  if (!eyesAwake && e !== "sleeping") return;
   currentEmotion = e; face.dataset.emotion = e;
   document.getElementById("mood").textContent = e === "sleeping" ? "asleep" : e;
 }
@@ -437,8 +502,8 @@ function blink(){
 /* ---------- speech out (Cartesia, fallback to browser voice) ---------- */
 let currentAudio = null;
 function afterSpeak(){
-  setEmotion(listening ? "sleeping" : "neutral");
-  setStatus(listening ? "Asleep — say “Lumous” to wake me." : "Idle.");
+  if (eyesAwake){ eyesAwake = false; setEmotion("sleeping"); }
+  setStatus(listening ? "Asleep — say “Sparky” to wake me." : "Idle.");
 }
 /* ---------- Cartesia cues ---------- */
 const CUE_RE = /<emotion\s+value="([^"]+)"\s*\/?>|<break[^>]*\/?>|<speed[^>]*\/?>|<volume[^>]*\/?>|\[laughter\]/gi;
@@ -516,7 +581,7 @@ const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recog = null, listening = false, busy = false;
 if (SR){
   recog = new SR(); recog.continuous = true; recog.interimResults = true; recog.lang = "en-US";
-  recog.onstart = ()=>{ setStatus("Asleep — say “Lumous” to wake me."); };
+  recog.onstart = ()=>{ setStatus("Asleep — say “Sparky” to wake me."); };
   recog.onend = ()=>{ if (listening && !busy) { try{ recog.start(); }catch(e){} } };
   recog.onerror = e => { if (e.error !== "no-speech") setStatus("Mic error: " + e.error); };
   recog.onresult = async ev => {
@@ -530,7 +595,7 @@ if (SR){
     if (!word) return;
     const idx = low.indexOf(word);
     let prompt = final.slice(idx + word.length).replace(/^[,.\s]+/, "").trim() || "Hello";
-    busy = true; blink(); setEmotion("surprised"); showHeard(word, prompt);
+    busy = true; eyesAwake = true; blink(); setEmotion("surprised"); showHeard(word, prompt);
     try{ recog.stop(); }catch(e){}
     await ask(prompt);
     busy = false;
@@ -551,9 +616,9 @@ function toggleMic(){
 }
 
 /* ---------- boot ---------- */
-renderMem(); scheduleReminders();
-if (!apiKey()) document.getElementById("keybar").classList.add("show");
-addMsg("Hi! I'm Lumous. Turn on the mic and say “Lumous, what time is it?” — or just type.", "bot");
+migrateOldStorage(); renderMem(); scheduleReminders(); setProvider(providerMode);
+if (!apiKey() && providerMode === "openrouter") document.getElementById("keybar").classList.add("show");
+addMsg("Hi! I'm Sparky. Turn on the mic and say “Sparky, what time is it?” — or just type.", "bot");
 </script>
 </body>
 </html>
